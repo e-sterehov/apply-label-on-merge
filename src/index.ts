@@ -1,13 +1,30 @@
 import { Application } from 'probot' // eslint-disable-line no-unused-vars
 
-export = (app: Application) => {
-  app.on('issues.opened', async (context) => {
-    const issueComment = context.issue({ body: 'Thanks for opening this issue!' })
-    await context.github.issues.createComment(issueComment)
-  })
-  // For more information on building apps:
-  // https://probot.github.io/docs/
+const regex = /(- issue#[^\s]+)/i;
 
-  // To get your app running against GitHub, see:
-  // https://probot.github.io/docs/development/
+export = (app: Application) => {
+    app.on('pull_request.closed', async (context) => {
+        const pullRequest = context.payload.pull_request
+
+        if (!pullRequest.merged) {
+            app.log('Pull request is closed, but not merged.');
+            return;
+        }
+
+        const match = regex.exec(pullRequest.title);
+        if (!match) {
+            app.log('No issues associated to PR found.');
+            return;
+        }
+
+        const issueId = match[1].split('#')[1];
+        // const issue = await context.github.issues.get(context.issue({
+        //     issue_number: issueId,
+        // }))
+        await context.github.issues.addLabels(context.issue({
+            labels: ['QA Ready'],
+            issue_number: issueId,
+        }))
+        app.log(`#${issueId} successfuly marked as QA Ready.`)
+    })
 }
